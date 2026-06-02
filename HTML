@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a14">
+  <title>Cognitive CMA OS</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0a0a14;
+      --card: #111118;
+      --accent: #7c6aff;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: var(--bg);
+      color: #e8e8f0;
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      padding: 20px 16px;
+      line-height: 1.6;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .title {
+      font-size: 26px;
+      font-weight: 700;
+      background: linear-gradient(90deg, #7c6aff, #a78bff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid #252538;
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    }
+    input, textarea {
+      width: 100%;
+      padding: 14px;
+      background: #1a1a2a;
+      border: 1px solid #33334d;
+      border-radius: 12px;
+      color: white;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 16px;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    
+    .slider-label {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 15px;
+    }
+    input[type="range"] { width: 100%; accent-color: var(--accent); }
+    
+    button {
+      background: linear-gradient(90deg, #7c6aff, #9b8cff);
+      color: white;
+      border: none;
+      padding: 16px;
+      border-radius: 12px;
+      font-size: 17px;
+      font-weight: 700;
+      width: 100%;
+      margin-top: 8px;
+      box-shadow: 0 4px 15px rgba(124, 106, 255, 0.4);
+      transition: all 0.2s;
+    }
+    button:active { transform: scale(0.97); }
+    .secondary-btn {
+      background: #252538;
+      margin-top: 8px;
+    }
+
+    #result { display: none; animation: fadeIn 0.4s ease; }
+    .verdict { font-size: 22px; font-weight: 700; margin: 12px 0; }
+    .ok { color: #22c55e; }
+    .avoid { color: #f59e0b; }
+    .emergency { color: #ef4444; }
+
+    .history-item {
+      padding: 14px;
+      background: #1a1a2a;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      border: 1px solid #33334d;
+    }
+    .history-item:hover { background: #22223a; }
+
+    @keyframes fadeIn { from {opacity:0; transform:translateY(10px);} to {opacity:1; transform:none;} }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="title">Cognitive CMA OS</div>
+    <button onclick="showHistory()" class="secondary-btn" style="width:auto; padding:10px 16px; font-size:15px;">履歴</button>
+  </div>
+
+  <div class="card">
+    <p style="margin-bottom:8px; color:#aaa;">今起きていること</p>
+    <textarea id="event" placeholder="例: 返信が来ない… 無視されてる気がする…">返信が来ない</textarea>
+  </div>
+
+  <div class="card">
+    <div class="slider-label">
+      <span>ストレスレベル</span>
+      <span id="stressVal">45</span>%
+    </div>
+    <input type="range" id="stress" min="0" max="100" value="45">
+  </div>
+
+  <button onclick="runCMA()">▶ 思考分析を実行</button>
+
+  <div id="result" class="card"></div>
+
+  <!-- 履歴画面 -->
+  <div id="historyScreen" style="display:none;">
+    <div class="card">
+      <h2 style="margin-bottom:16px;">分析履歴</h2>
+      <div id="historyList"></div>
+      <button onclick="clearAllHistory()" class="secondary-btn" style="background:#4c1d1d;">全履歴を削除</button>
+      <button onclick="hideHistory()" class="secondary-btn">閉じる</button>
+    </div>
+  </div>
+
+<script>
+// ====================== CMAエンジン ======================
+class CognitiveCMAOS {
+  analyze(event, stress) {
+    const text = event.toLowerCase().trim();
+    let score = stress * 0.75;
+
+    const dangerWords = ["無視","嫌","不安","怖","死","終わり","限界","最悪","やば","自殺"];
+    const avoidWords = ["返信","来ない","既読","放置","疲れ","しんど","落ち込"];
+
+    dangerWords.forEach(w => { if (text.includes(w)) score += 28; });
+    avoidWords.forEach(w => { if (text.includes(w)) score += 16; });
+
+    if (text.length > 60) score += 12;
+    if (/[？?！!]/.test(text)) score += 8;
+
+    score = Math.min(99, Math.round(score));
+
+    let verdict, label, color, advice;
+    if (score >= 82) {
+      verdict = "EMERGENCY"; label = "⚠️ EMERGENCY"; color = "#ef4444";
+      advice = "今すぐ思考を停止。誰かに相談するか、深呼吸を。";
+    } else if (score >= 58) {
+      verdict = "AVOID"; label = "🟡 AVOID"; color = "#f59e0b";
+      advice = "判断を保留。距離を置くか時間を置いてから考えましょう。";
+    } else {
+      verdict = "OK"; label = "✅ OK"; color = "#22c55e";
+      advice = "比較的冷静です。論理的に対応できます。";
+    }
+
+    return { score, verdict, label, color, advice };
+  }
+}
+
+// ====================== 履歴機能 ======================
+function saveToHistory(event, stress, result) {
+  let history = JSON.parse(localStorage.getItem('cmaHistory') || '[]');
+  
+  history.unshift({
+    timestamp: new Date().toLocaleString('ja-JP'),
+    event: event,
+    stress: stress,
+    score: result.score,
+    label: result.label,
+    advice: result.advice
+  });
+
+  // 最大50件保持
+  if (history.length > 50) history.pop();
+  
+  localStorage.setItem('cmaHistory', JSON.stringify(history));
+}
+
+function showHistory() {
+  const history = JSON.parse(localStorage.getItem('cmaHistory') || '[]');
+  const list = document.getElementById('historyList');
+  list.innerHTML = '';
+
+  if (history.length === 0) {
+    list.innerHTML = '<p style="color:#666; text-align:center; padding:20px;">まだ履歴がありません</p>';
+  } else {
+    history.forEach((item, index) => {
+      const div = document.createElement('div');
+      div.className = 'history-item';
+      div.innerHTML = `
+        <strong>${item.label}</strong> ${item.score}点<br>
+        <small style="color:#888;">${item.timestamp}</small><br>
+        <span style="font-size:14px;">${item.event.substring(0, 60)}${item.event.length > 60 ? '...' : ''}</span>
+      `;
+      div.onclick = () => loadHistoryItem(item);
+      list.appendChild(div);
+    });
+  }
+
+  document.getElementById('historyScreen').style.display = 'block';
+}
+
+function hideHistory() {
+  document.getElementById('historyScreen').style.display = 'none';
+}
+
+function loadHistoryItem(item) {
+  hideHistory();
+  const resDiv = document.getElementById('result');
+  resDiv.style.display = "block";
+  resDiv.innerHTML = `
+    <h2 class="verdict" style="color:${item.label.includes('EMERGENCY') ? '#ef4444' : item.label.includes('AVOID') ? '#f59e0b' : '#22c55e'}">
+      ${item.label}
+    </h2>
+    <p style="font-size:28px; font-weight:700; color:#ddd;">${item.score} <span style="font-size:16px;">点</span></p>
+    <p style="margin:14px 0; line-height:1.7;">${item.advice}</p>
+    <div style="font-size:13px; color:#777; margin-top:12px;">
+      入力: ${item.event}<br>
+      ストレス: ${item.stress}%<br>
+      ${item.timestamp}
+    </div>
+  `;
+}
+
+function clearAllHistory() {
+  if (confirm('すべての履歴を削除しますか？')) {
+    localStorage.removeItem('cmaHistory');
+    showHistory();
+  }
+}
+
+// ====================== メイン実行 ======================
+function runCMA() {
+  const event = document.getElementById("event").value.trim();
+  const stress = parseInt(document.getElementById("stress").value);
+  
+  if (!event) {
+    alert("出来事を入力してください");
+    return;
+  }
+
+  const result = new CognitiveCMAOS().analyze(event, stress);
+  const resDiv = document.getElementById("result");
+
+  resDiv.style.display = "block";
+  resDiv.innerHTML = `
+    <h2 class="verdict" style="color:${result.color}">${result.label}</h2>
+    <p style="font-size:28px; font-weight:700; color:#ddd;">${result.score} <span style="font-size:16px;">点</span></p>
+    <p style="margin:14px 0; line-height:1.7;">${result.advice}</p>
+    <div style="font-size:13px; color:#777; margin-top:12px;">
+      入力: ${event}<br>
+      ストレス: ${stress}%
+    </div>
+  `;
+
+  // 履歴に保存
+  saveToHistory(event, stress, result);
+}
+
+// スライダー連動
+document.getElementById("stress").addEventListener("input", function() {
+  document.getElementById("stressVal").textContent = this.value;
+});
+</script>
+
+</body>
+</html>
