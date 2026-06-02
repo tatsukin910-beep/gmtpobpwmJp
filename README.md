@@ -1,1 +1,268 @@
-# gmtpobpwmJp
+#<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0a0a14">
+  <title>Cognitive CMA OS</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #0a0a14; --card: #111118; --accent: #7c6aff; }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: var(--bg); color: #e8e8f0; font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh; padding: 16px; line-height: 1.6;
+    }
+    .header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+    .title { font-size:26px; font-weight:700; background:linear-gradient(90deg,#7c6aff,#a78bff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .tab { display:flex; gap:8px; margin-bottom:16px; }
+    .tab-btn { flex:1; padding:12px; background:#1f1f2e; border:none; border-radius:12px; color:#aaa; font-weight:600; }
+    .tab-btn.active { background:var(--accent); color:white; }
+    .card { background:var(--card); border:1px solid #252538; border-radius:16px; padding:20px; margin-bottom:16px; }
+    textarea, input { width:100%; padding:14px; background:#1a1a2a; border:1px solid #33334d; border-radius:12px; color:white; font-family:'IBM Plex Mono', monospace; }
+    textarea { min-height:120px; resize:vertical; }
+    button { background:linear-gradient(90deg,#7c6aff,#9b8cff); color:white; border:none; padding:16px; border-radius:12px; font-size:17px; font-weight:700; width:100%; margin:8px 0; }
+    button:active { transform:scale(0.97); }
+    .secondary-btn { background:#252538; }
+    .verdict { font-size:24px; font-weight:700; margin:12px 0; }
+    .history-item { padding:14px; background:#1a1a2a; border-radius:12px; margin-bottom:10px; cursor:pointer; }
+    canvas { max-height:260px; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="title">Cognitive CMA OS</div>
+    <button onclick="showTab(1)" class="secondary-btn" style="width:auto;padding:8px 14px;font-size:14px;">ダッシュボード</button>
+  </div>
+
+  <!-- タブ -->
+  <div class="tab">
+    <button onclick="showTab(0)" class="tab-btn active" id="tab0">分析</button>
+    <button onclick="showTab(1)" class="tab-btn" id="tab1">統計</button>
+    <button onclick="showTab(2)" class="tab-btn" id="tab2">履歴</button>
+  </div>
+
+  <!-- 分析画面 -->
+  <div id="screen0">
+    <div class="card">
+      <p style="margin-bottom:8px;color:#aaa;">今起きていること</p>
+      <textarea id="event" placeholder="例: 返信が3日来ない。無視されている気がして不安...">返信が来ない</textarea>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span>ストレスレベル</span>
+        <span id="stressVal">45</span>%
+      </div>
+      <input type="range" id="stress" min="0" max="100" value="45">
+    </div>
+
+    <button onclick="runCMA()">▶ Grok風分析を実行</button>
+    <div id="result" class="card" style="display:none;"></div>
+  </div>
+
+  <!-- 統計ダッシュボード -->
+  <div id="screen1" style="display:none;">
+    <div class="card">
+      <h3>ストレス傾向</h3>
+      <canvas id="stressChart"></canvas>
+    </div>
+    <div class="card">
+      <h3>スコア分布</h3>
+      <canvas id="scoreChart"></canvas>
+    </div>
+    <div class="card">
+      <h3>利用統計</h3>
+      <p id="statsText" style="font-size:15px;line-height:1.8;"></p>
+    </div>
+  </div>
+
+  <!-- 履歴画面 -->
+  <div id="screen2" style="display:none;">
+    <div class="card">
+      <input type="text" id="searchInput" placeholder="履歴を検索..." onkeyup="filterHistory()">
+      <div id="historyList" style="margin-top:12px;"></div>
+      <button onclick="clearAllHistory()" class="secondary-btn" style="background:#4c1d1d;margin-top:16px;">全履歴削除</button>
+    </div>
+  </div>
+
+<script>
+// ==================== Grok風賢い分析エンジン ====================
+class CognitiveCMAOS {
+  analyze(event, stress) {
+    const text = event.toLowerCase().trim();
+    let baseScore = stress * 0.72;
+
+    // 感情分析風キーワード
+    const emergencyWords = ["死","自殺","限界","終わった","無理","やばい","怖い","消えたい"];
+    const avoidWords = ["無視","返信","来ない","既読","放置","疲れた","しんどい","嫌"];
+    const positiveWords = ["大丈夫","落ち着","考え","解決"];
+
+    let score = baseScore;
+    emergencyWords.forEach(w => { if (text.includes(w)) score += 32; });
+    avoidWords.forEach(w => { if (text.includes(w)) score += 18; });
+    if (text.length > 70) score += 10;
+    if (/[？?！!]{2,}/.test(text)) score += 12;
+
+    score = Math.min(99, Math.round(score));
+
+    // Grok風自然言語アドバイス生成
+    let advice = "";
+    if (score >= 85) {
+      advice = "これはかなり危険な思考ループに入っています。**今すぐ思考を止めて**、信頼できる友人・家族・専門家に連絡してください。あなたは一人じゃないです。深呼吸を10回してみましょう。";
+    } else if (score >= 65) {
+      advice = `「${event}」という状況でストレスが高まっていますね。まずは**距離を置く**ことをおすすめします。相手の行動に自分の価値を決めつけすぎないで。今は判断を保留して、好きな音楽を聴いたり散歩したりして頭を冷やしましょう。`;
+    } else if (score >= 45) {
+      advice = `少し心配な気持ちが出てきていますが、まだコントロールできる範囲です。**事実と感情を分離**してみましょう。「本当に無視されているのか？それともただ忙しいだけ？」という視点で考えてみると、少し楽になるかもしれません。`;
+    } else {
+      advice = `比較的冷静な状態です。論理的に対応できそうです。もし気になるなら「最悪の場合どうなるか」を紙に書いて整理してみてください。意外と大したことじゃないと気づくことが多いですよ。`;
+    }
+
+    return {
+      score,
+      label: score >= 85 ? "⚠️ EMERGENCY" : score >= 65 ? "🟡 AVOID" : "✅ OK",
+      color: score >= 85 ? "#ef4444" : score >= 65 ? "#f59e0b" : "#22c55e",
+      advice
+    };
+  }
+}
+
+// ==================== 履歴・統計管理 ====================
+let historyData = [];
+
+function loadHistory() {
+  historyData = JSON.parse(localStorage.getItem('cmaHistory') || '[]');
+}
+
+function saveToHistory(event, stress, result) {
+  historyData.unshift({
+    timestamp: new Date().toLocaleString('ja-JP'),
+    event, stress, ...result
+  });
+  if (historyData.length > 60) historyData.pop();
+  localStorage.setItem('cmaHistory', JSON.stringify(historyData));
+  renderHistory();
+  updateDashboard();
+}
+
+function renderHistory(filtered = null) {
+  const list = document.getElementById('historyList');
+  const data = filtered || historyData;
+  list.innerHTML = data.length === 0 ? '<p style="color:#666;text-align:center;padding:30px;">履歴がありません</p>' : '';
+  
+  data.forEach(item => {
+    const div = document.createElement('div');
+    div.className = 'history-item';
+    div.innerHTML = `<strong>${item.label}</strong> ${item.score}点 — ${item.timestamp}<br><small>${item.event.substring(0,65)}...</small>`;
+    div.onclick = () => showResultFromHistory(item);
+    list.appendChild(div);
+  });
+}
+
+function filterHistory() {
+  const term = document.getElementById('searchInput').value.toLowerCase();
+  const filtered = historyData.filter(h => h.event.toLowerCase().includes(term));
+  renderHistory(filtered);
+}
+
+function showResultFromHistory(item) {
+  showTab(0);
+  const resDiv = document.getElementById("result");
+  resDiv.style.display = "block";
+  resDiv.innerHTML = `
+    <h2 class="verdict" style="color:${item.color}">${item.label}</h2>
+    <p style="font-size:32px;font-weight:700;">${item.score}点</p>
+    <p style="margin:16px 0;line-height:1.7;">${item.advice}</p>
+    <small style="color:#777;">${item.timestamp} | ストレス:${item.stress}%</small>
+  `;
+}
+
+function clearAllHistory() {
+  if (confirm("全履歴を削除しますか？")) {
+    localStorage.removeItem('cmaHistory');
+    historyData = [];
+    renderHistory();
+    updateDashboard();
+  }
+}
+
+// ==================== ダッシュボード ====================
+let stressChart, scoreChart;
+
+function updateDashboard() {
+  const scores = historyData.map(h => h.score);
+  const stresses = historyData.map(h => h.stress);
+  const dates = historyData.map(h => h.timestamp.split(' ')[0]);
+
+  // ストレス傾向
+  if (stressChart) stressChart.destroy();
+  stressChart = new Chart(document.getElementById('stressChart'), {
+    type: 'line',
+    data: { labels: dates.slice(0,10).reverse(), datasets: [{ label:'ストレス(%)', data: stresses.slice(0,10).reverse(), borderColor:'#7c6aff', tension:0.3 }] },
+    options: { responsive:true, plugins:{legend:{display:false}} }
+  });
+
+  // スコア分布
+  if (scoreChart) scoreChart.destroy();
+  scoreChart = new Chart(document.getElementById('scoreChart'), {
+    type: 'bar',
+    data: { labels: ['OK','AVOID','EMERGENCY'], datasets: [{ label:'件数', data: [
+      historyData.filter(h=>h.score<65).length,
+      historyData.filter(h=>h.score>=65 && h.score<85).length,
+      historyData.filter(h=>h.score>=85).length
+    ], backgroundColor:['#22c55e','#f59e0b','#ef4444'] }] },
+    options: { responsive:true }
+  });
+
+  document.getElementById('statsText').innerHTML = `
+    総分析回数: <strong>${historyData.length}</strong>回<br>
+    平均ストレス: <strong>${historyData.length ? Math.round(stresses.reduce((a,b)=>a+b,0)/stresses.length) : 0}</strong>%<br>
+    危険ゾーン入り率: <strong>${historyData.length ? Math.round((historyData.filter(h=>h.score>=85).length / historyData.length)*100) : 0}</strong>%
+  `;
+}
+
+// ==================== メイン ====================
+function runCMA() {
+  const event = document.getElementById("event").value.trim();
+  const stress = parseInt(document.getElementById("stress").value);
+  
+  if (!event) return alert("出来事を入力してください");
+
+  const result = new CognitiveCMAOS().analyze(event, stress);
+  const resDiv = document.getElementById("result");
+  resDiv.style.display = "block";
+  resDiv.innerHTML = `
+    <h2 class="verdict" style="color:${result.color}">${result.label}</h2>
+    <p style="font-size:32px;font-weight:700;color:#ddd;">${result.score}点</p>
+    <p style="margin:18px 0 16px;line-height:1.75;">${result.advice}</p>
+    <small style="color:#777;">入力: ${event}</small>
+  `;
+
+  saveToHistory(event, stress, result);
+}
+
+function showTab(n) {
+  document.querySelectorAll('[id^="screen"]').forEach(s => s.style.display = 'none');
+  document.getElementById(`screen${n}`).style.display = 'block';
+  
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', i===n));
+  
+  if (n === 1) updateDashboard();
+  if (n === 2) renderHistory();
+}
+
+// スライダー
+document.getElementById("stress").addEventListener("input", function() {
+  document.getElementById("stressVal").textContent = this.value;
+});
+
+// 初期化
+loadHistory();
+showTab(0);
+</script>
+</body>
+</html>
